@@ -1,0 +1,29 @@
+# EditorConfig: https://editorconfig.org
+# Keeps indentation and line endings consistent across editors for this
+# Python + TypeScript project.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python: PEP 8 — 4 spaces
+[*.py]
+indent_style = space
+indent_size = 4
+
+# Web and config files: 2 spaces
+[*.{ts,tsx,js,jsx,json,yml,yaml,css,html}]
+indent_style = space
+indent_size = 2
+
+# Markdown: keep trailing spaces (hard line breaks use two trailing spaces)
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require hard tabs
+[Makefile]
+indent_style = tab
