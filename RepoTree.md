@@ -1,6 +1,7 @@
 docextract-ai/
 ├── .github/
 │   ├── workflows/
+│   │   ├── ci.yml
 │   │   └── .gitkeep
 │   ├── COMMIT_CONVENTION.md
 │   ├── CONTRIBUTING.md
@@ -26,7 +27,6 @@ docextract-ai/
 │   │   │   ├── conftest.py
 │   │   │   ├── test_error_format.py
 │   │   │   └── test_health.py
-│   │   ├── .env
 │   │   └── pyproject.toml
 │   └── web/
 │       └── .gitkeep
