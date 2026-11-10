@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/middleware.py
+
 """Request-id middleware built as pure ASGI.
 
 ``contextvars.ContextVar`` stores per-request values without passing them

@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/logging_config.py
+
 """Structured logging setup with structlog.
 
 ``print`` output cannot be searched, filtered, or correlated: it is free text

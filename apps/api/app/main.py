@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/main.py
+
 """FastAPI application assembly: lifespan, middleware, handlers, routers.
 
 The full ASGI stack for an incoming HTTP request, top to bottom:

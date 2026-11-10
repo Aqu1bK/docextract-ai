@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/api/v1/router.py
+
 """API v1 router aggregating all endpoint routers under the version prefix."""
 
 from fastapi import APIRouter

@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/config.py
+
 """Application settings loaded from environment variables.
 
 Twelve-Factor app methodology stores configuration in the environment, never in
@@ -33,6 +35,14 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
+
+    # No default on purpose: a missing DATABASE_URL must fail at startup
+    # (fail fast) instead of surfacing as a confusing connection error on
+    # the first database-touching request. Alembic reads the same value in
+    # alembic/env.py.
+    DATABASE_URL: str
+
+    DB_ECHO: bool = False
 
     @property
     def is_production(self) -> bool:

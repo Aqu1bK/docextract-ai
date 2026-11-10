@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/errors.py
+
 """Standard error envelope and exception handlers.
 
 Every error the API produces uses one response shape:
