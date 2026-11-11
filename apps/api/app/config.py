@@ -44,6 +44,21 @@ class Settings(BaseSettings):
 
     DB_ECHO: bool = False
 
+    # Supabase Auth is the hosted JWT issuer: these three fields are what
+    # the server needs to verify the tokens it signs. The secret must come
+    # from the environment (Supabase dashboard > Settings > API) — never
+    # code, never the repository.
+    SUPABASE_URL: str
+    SUPABASE_JWT_SECRET: str
+    # If empty, the issuer defaults to SUPABASE_URL + "/auth/v1" (the
+    # GoTrue endpoint Supabase puts in the token's iss claim).
+    JWT_ISSUER: str = ""
+
+    @property
+    def jwt_issuer(self) -> str:
+        """Return the JWT issuer URL, defaulting to SUPABASE_URL + /auth/v1."""
+        return self.JWT_ISSUER or f"{self.SUPABASE_URL}/auth/v1"
+
     @property
     def is_production(self) -> bool:
         """Return True when the app runs with production settings applied."""

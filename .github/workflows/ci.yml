@@ -114,6 +114,12 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/docextract_test
+      # Phase 4: the auth suite mints and validates real JWTs, so it needs
+      # the same three Supabase settings the app requires. Test-only values:
+      # no real secret, and the issuer derivation must round-trip locally.
+      SUPABASE_URL: https://auth-test.supabase.co
+      SUPABASE_JWT_SECRET: test-only-jwt-secret-not-a-real-credential
+      JWT_ISSUER: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
