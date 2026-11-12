@@ -109,9 +109,14 @@ class SupabaseStorageProvider(StorageProvider):
             or "application/octet-stream"
         )
 
+        raw_size = _get(info, "size", 0)
+        # isinstance() validates at runtime AND narrows the type for mypy:
+        # _get returns `object`, and int() has no overload accepting object.
+        size_bytes = int(raw_size) if isinstance(raw_size, int | float | str) else 0
+
         return StorageObjectMeta(
             storage_path=storage_path,
-            size_bytes=int(_get(info, "size", 0) or 0),
+            size_bytes=size_bytes,
             content_type=str(content_type),
         )
 
