@@ -44,11 +44,32 @@ class Settings(BaseSettings):
 
     DB_ECHO: bool = False
 
+    # Storage backend selection and bucket names. The provider string is
+    # what the factory reads: "supabase" on the hosted demo, "minio" in
+    # Local Docker Mode — a configuration change, not a code change.
+    STORAGE_PROVIDER: str = "supabase"
+    STORAGE_BUCKET: str = "documents"
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = ""
+    MINIO_SECRET_KEY: str = ""
+    MINIO_BUCKET: str = "documents"
+
+    # Upload intake limits (FR-005 to FR-010): size, pages, and the daily
+    # quota that backstops the free tier. Defaults match .env.example.
+    MAX_UPLOAD_MB: int = 10
+    MAX_PAGES: int = 20
+    RETENTION_DAYS: int = 7
+    MAX_UPLOADS_PER_DAY: int = 10
+
     # Supabase Auth is the hosted JWT issuer: these three fields are what
     # the server needs to verify the tokens it signs. The secret must come
     # from the environment (Supabase dashboard > Settings > API) — never
     # code, never the repository.
     SUPABASE_URL: str
+    # Service role key: server-side storage administration (creating
+    # signed URLs, reading object info). It bypasses row-level security
+    # and must never ship to the frontend; only the API process reads it.
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_JWT_SECRET: str
     # If empty, the issuer defaults to SUPABASE_URL + "/auth/v1" (the
     # GoTrue endpoint Supabase puts in the token's iss claim).

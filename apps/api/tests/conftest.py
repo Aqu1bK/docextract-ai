@@ -15,6 +15,8 @@ from app.config import get_settings
 from app.db.models import Organization, Role, User, UserRole
 from app.db.session import get_db
 from app.main import app
+from app.storage.factory import get_storage
+from tests.fakes import FakeStorageProvider
 
 
 @pytest.fixture
@@ -178,3 +180,25 @@ def seed_test_user(db_session: Session) -> Callable[..., User]:
         return user
 
     return _seed_test_user
+
+
+# ----------------------------------------------------------------------
+# Storage fixtures (Phase 5)
+# ----------------------------------------------------------------------
+
+
+@pytest.fixture
+def storage_override() -> Iterator[FakeStorageProvider]:
+    """Install FakeStorageProvider as the app's storage dependency.
+
+    The override is the whole difference between the CI suite and a
+    live run: the real flow (endpoints, services, database) executes
+    against an in-memory bucket instead of Supabase or MinIO, so no
+    credentials, network, or bucket exist anywhere in the test run.
+    Popping the override in teardown keeps the app's real wiring for
+    any test that wants it (the live round-trip script does).
+    """
+    fake = FakeStorageProvider()
+    app.dependency_overrides[get_storage] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_storage, None)

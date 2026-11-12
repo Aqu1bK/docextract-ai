@@ -94,6 +94,46 @@ class RateLimitException(AppException):
     message = "Too many requests."
 
 
+class FileTooLargeException(AppException):
+    """The uploaded file exceeds the configured size limit."""
+
+    status_code = 413
+    code = "FILE_TOO_LARGE"
+    message = "The uploaded file exceeds the size limit."
+
+
+class UnsupportedFileTypeException(AppException):
+    """The file's content type or magic bytes are not accepted."""
+
+    status_code = 415
+    code = "UNSUPPORTED_FILE_TYPE"
+    message = "The file type is not supported."
+
+
+class EncryptedPdfException(AppException):
+    """The uploaded PDF is password-protected and cannot be read."""
+
+    status_code = 422
+    code = "ENCRYPTED_PDF"
+    message = "The PDF is encrypted."
+
+
+class PageLimitExceededException(AppException):
+    """The PDF exceeds the configured page-count limit."""
+
+    status_code = 422
+    code = "PAGE_LIMIT_EXCEEDED"
+    message = "The PDF exceeds the page limit."
+
+
+class StorageVerificationException(AppException):
+    """The stored object does not match what the client claimed."""
+
+    status_code = 409
+    code = "STORAGE_VERIFICATION_FAILED"
+    message = "The stored object failed verification."
+
+
 class InternalErrorException(AppException):
     """An unexpected error occurred inside the application."""
 

@@ -19,6 +19,9 @@ dependencies = [
     "alembic>=1.13",
     "psycopg[binary]>=3.1",
     "PyJWT>=2.8",  # JWT validation for Supabase Auth tokens
+    "pypdf>=4",  # PDF structure validation: page count, encryption check
+    "storage3>=0.8",  # official Supabase Storage client (supabase-py's storage layer)
+    "minio>=7.2",  # official MinIO client for Local Docker Mode storage
 ]
 
 [project.optional-dependencies]
