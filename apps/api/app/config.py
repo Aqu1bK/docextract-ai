@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     # GoTrue endpoint Supabase puts in the token's iss claim).
     JWT_ISSUER: str = ""
 
+    # Extraction backend selection. The string is what the extraction
+    # factory reads: "mock" on the hosted demo, "light_parser" when cost
+    # control matters, "vision_llm" from Phase 10 — a configuration
+    # change, not a code change (same seam as STORAGE_PROVIDER).
+    EXTRACTION_MODE: str = "mock"
+
     @property
     def jwt_issuer(self) -> str:
         """Return the JWT issuer URL, defaulting to SUPABASE_URL + /auth/v1."""

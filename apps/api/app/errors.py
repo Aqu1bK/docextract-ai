@@ -161,6 +161,22 @@ class ErrorResponse(BaseModel):
     error: ErrorBody
 
 
+class ExtractionProviderException(AppException):
+    """The extraction provider failed while processing a document."""
+
+    status_code = 500
+    code = "EXTRACTION_PROVIDER_FAILED"
+    message = "The extraction provider encountered an error."
+
+
+class ConfidenceScoringException(AppException):
+    """Confidence scoring could not produce a score for a field."""
+
+    status_code = 500
+    code = "CONFIDENCE_SCORING_FAILED"
+    message = "Confidence scoring failed."
+
+
 def _envelope_response(
     status_code: int, code: str, message: str, details: dict[str, Any] | list[Any]
 ) -> JSONResponse:
