@@ -1,5 +1,3 @@
-# docextract-ai/apps/api/app/config.py
-
 """Application settings loaded from environment variables.
 
 Twelve-Factor app methodology stores configuration in the environment, never in
@@ -61,6 +59,33 @@ class Settings(BaseSettings):
     RETENTION_DAYS: int = 7
     MAX_UPLOADS_PER_DAY: int = 10
 
+    # Extraction backend selection. The string is what the extraction
+    # factory reads: "mock" on the hosted demo, "light_parser" when cost
+    # control matters, "vision_llm" from Phase 10 — a configuration
+    # change, not a code change (same seam as STORAGE_PROVIDER).
+    EXTRACTION_MODE: str = "mock"
+
+    # Confidence floor for review routing: a field scoring below this
+    # value routes its document to needs_review (Phase 7 worker rule;
+    # value mirrors .env.example).
+    CONFIDENCE_THRESHOLD: float = 0.75
+
+    # Worker runtime (Phase 7). WORKER_ENABLED is the kill switch the
+    # runner loop reads; WORKER_POLL_SECONDS is the idle sleep between
+    # claim attempts; MAX_JOB_ATTEMPTS caps retries before the job is
+    # dead-lettered to FAILED; WORKER_ID stamps leased_by so operators
+    # can see which process holds a job.
+    WORKER_ENABLED: bool = True
+    WORKER_POLL_SECONDS: int = 3
+    MAX_JOB_ATTEMPTS: int = 3
+    WORKER_ID: str = "worker-1"
+
+    # Pipeline provenance stamped on every job row: what code version
+    # produced a result, so a future schema change can tell old rows
+    # from new ones (re-extraction decisions depend on it).
+    PIPELINE_VERSION: str = "1.0.0"
+    SCHEMA_VERSION: str = "1.0.0"
+
     # Supabase Auth is the hosted JWT issuer: these three fields are what
     # the server needs to verify the tokens it signs. The secret must come
     # from the environment (Supabase dashboard > Settings > API) — never
@@ -74,12 +99,6 @@ class Settings(BaseSettings):
     # If empty, the issuer defaults to SUPABASE_URL + "/auth/v1" (the
     # GoTrue endpoint Supabase puts in the token's iss claim).
     JWT_ISSUER: str = ""
-
-    # Extraction backend selection. The string is what the extraction
-    # factory reads: "mock" on the hosted demo, "light_parser" when cost
-    # control matters, "vision_llm" from Phase 10 — a configuration
-    # change, not a code change (same seam as STORAGE_PROVIDER).
-    EXTRACTION_MODE: str = "mock"
 
     @property
     def jwt_issuer(self) -> str:

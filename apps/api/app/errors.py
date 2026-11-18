@@ -177,6 +177,28 @@ class ConfidenceScoringException(AppException):
     message = "Confidence scoring failed."
 
 
+class JobAlreadyExistsException(AppException):
+    """An extraction job is already active for the document and key.
+
+    Raised when job creation loses the duplicate race despite the
+    active-job lookup (a concurrent request with the same idempotency key
+    committed between the SELECT and the INSERT). The caller can treat
+    409 as success: the job it wanted exists.
+    """
+
+    status_code = 409
+    code = "JOB_ALREADY_EXISTS"
+    message = "An extraction job already exists for this document."
+
+
+class JobNotFoundException(AppException):
+    """No extraction job exists for the requested document."""
+
+    status_code = 404
+    code = "JOB_NOT_FOUND"
+    message = "No extraction job found for this document."
+
+
 def _envelope_response(
     status_code: int, code: str, message: str, details: dict[str, Any] | list[Any]
 ) -> JSONResponse:
