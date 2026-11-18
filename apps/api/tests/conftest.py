@@ -2,6 +2,7 @@
 
 """Shared pytest fixtures."""
 
+import decimal
 import time
 from collections.abc import Callable, Iterator
 
@@ -12,7 +13,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
-from app.db.models import Organization, Role, User, UserRole
+from app.db.models import Document, Organization, Role, User, UserRole
 from app.db.session import get_db
 from app.main import app
 from app.storage.factory import get_storage
@@ -202,3 +203,158 @@ def storage_override() -> Iterator[FakeStorageProvider]:
     app.dependency_overrides[get_storage] = lambda: fake
     yield fake
     app.dependency_overrides.pop(get_storage, None)
+
+
+# ----------------------------------------------------------------------
+# Review fixtures (Phase 8)
+# ----------------------------------------------------------------------
+
+
+@pytest.fixture
+def seed_document_with_fields(db_session: Session) -> Callable[..., Document]:
+    """Return a helper that seeds a document plus three extracted fields.
+
+    The three fields model the review states a real document arrives with:
+    one low-confidence required field the reviewer must resolve, one
+    high-confidence required field ready to accept, and one optional
+    low-confidence field that routes to review but never blocks approval.
+    A job row is seeded too because ``extracted_fields.job_id`` is
+    NOT NULL — the fields belong to the run that produced them.
+
+    Rows live inside the test transaction: rollback at teardown wipes them
+    exactly like every other seeded row in this suite.
+
+    Args:
+        db_session: The per-test rollback session all seeded rows go into.
+
+    Returns:
+        A helper creating (org, user, job, document, 3 fields) per call;
+        each call gets fresh rows so tests never share state.
+    """
+
+    def _seed_document_with_fields(
+        email: str = "reviewer@t.dev",
+        org_slug: str = "review-test-org",
+        roles: list[str] | None = None,
+    ) -> Document:
+        """Create org/user/job/document plus 3 fields; return the document.
+
+        The user is seeded with roles directly (default: reviewer) so tests
+        never need a second user that could collide on email across orgs
+        (the JWT lookup is by email alone, so two orgs holding the same
+        email makes the document invisible to the second one).
+        """
+        import uuid
+
+        from app.db.models import ExtractedField, ExtractionJob
+        from app.domain.enums import DocumentStatus, FieldReviewStatus, JobStatus
+
+        org = db_session.execute(
+            select(Organization).where(Organization.slug == org_slug)
+        ).scalar_one_or_none()
+        if org is None:
+            org = Organization(name="Review Test Org", slug=org_slug, settings_json={})
+            db_session.add(org)
+            db_session.flush()
+
+        user = db_session.execute(
+            select(User).where(User.organization_id == org.id, User.email == email)
+        ).scalar_one_or_none()
+        if user is None:
+            user = User(
+                organization_id=org.id,
+                email=email,
+                full_name="Review Seeder",
+                is_active=True,
+            )
+            db_session.add(user)
+            db_session.flush()
+
+        for role_name in roles or ["reviewer"]:
+            role = db_session.execute(
+                select(Role).where(Role.name == role_name)
+            ).scalar_one_or_none()
+            if role is None:
+                role = Role(name=role_name, description="Created by review tests")
+                db_session.add(role)
+                db_session.flush()
+            membership = db_session.execute(
+                select(UserRole).where(UserRole.user_id == user.id, UserRole.role_id == role.id)
+            ).scalar_one_or_none()
+            if membership is None:
+                db_session.add(UserRole(user_id=user.id, role_id=role.id))
+                db_session.flush()
+
+        document = Document(
+            organization_id=org.id,
+            uploaded_by=user.id,
+            file_name="invoice.pdf",
+            content_type="application/pdf",
+            sha256=uuid.uuid4().hex,
+            size_bytes=2048,
+            page_count=1,
+            storage_path=f"{org.id}/{uuid.uuid4()}.pdf",
+            status=DocumentStatus.NEEDS_REVIEW,
+            parsing_mode="text",
+        )
+        db_session.add(document)
+        db_session.flush()
+
+        job = ExtractionJob(
+            organization_id=org.id,
+            document_id=document.id,
+            idempotency_key=f"seed-{uuid.uuid4().hex[:12]}",
+            status=JobStatus.SUCCEEDED,
+            mode="mock",
+            pipeline_version="1.0.0",
+            schema_version="1.0.0",
+        )
+        db_session.add(job)
+        db_session.flush()
+
+        fields = [
+            ExtractedField(
+                organization_id=org.id,
+                document_id=document.id,
+                job_id=job.id,
+                field_key="invoice_total",
+                field_label="Invoice Total",
+                value_text="1250.00",
+                confidence=decimal.Decimal("0.4200"),
+                source="mock",
+                page_number=1,
+                review_status=FieldReviewStatus.PENDING,
+                is_required=True,
+            ),
+            ExtractedField(
+                organization_id=org.id,
+                document_id=document.id,
+                job_id=job.id,
+                field_key="invoice_number",
+                field_label="Invoice Number",
+                value_text="INV-2026-001",
+                confidence=decimal.Decimal("0.9800"),
+                source="mock",
+                page_number=1,
+                review_status=FieldReviewStatus.PENDING,
+                is_required=True,
+            ),
+            ExtractedField(
+                organization_id=org.id,
+                document_id=document.id,
+                job_id=job.id,
+                field_key="vendor_note",
+                field_label="Vendor Note",
+                value_text="Payable within 30 days",
+                confidence=decimal.Decimal("0.4100"),
+                source="mock",
+                page_number=1,
+                review_status=FieldReviewStatus.PENDING,
+                is_required=False,
+            ),
+        ]
+        db_session.add_all(fields)
+        db_session.flush()
+        return document
+
+    return _seed_document_with_fields

@@ -199,6 +199,20 @@ class JobNotFoundException(AppException):
     message = "No extraction job found for this document."
 
 
+class ApprovalBlockedException(AppException):
+    """A blocking condition prevents approving the document.
+
+    Raised when approval was requested while required fields are
+    unresolved or a low-confidence field is still pending; the details
+    carry the machine-readable ``blockers`` list so the client can show
+    exactly what must be resolved before approval can succeed.
+    """
+
+    status_code = 409
+    code = "APPROVAL_BLOCKED"
+    message = "Document cannot be approved."
+
+
 def _envelope_response(
     status_code: int, code: str, message: str, details: dict[str, Any] | list[Any]
 ) -> JSONResponse:
