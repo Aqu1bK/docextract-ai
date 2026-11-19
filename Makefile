@@ -23,7 +23,7 @@ init: ## Create the project folder structure (scripts/init_project.sh)
 install: ## Install all dependencies (Python)
     cd apps/api && pip install -e ".[dev]"
     # Web install activates in Phase 9
-    # cd apps/web && npm install
+    cd apps/web && npm install
 
 # ------------------------------------------------------------------
 # Development

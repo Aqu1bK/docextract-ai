@@ -1,0 +1,92 @@
+@import 'tailwindcss';
+
+/*
+ * DocExtract AI — "Ink on Paper" design system.
+ *
+ * Token vocabulary:
+ *   ink / paper              the two poles: foreground ink, surface paper
+ *   ink-muted / paper-muted  de-emphasized text / recessed surface
+ *   rule                     hairline separators (1px borders, never shadows)
+ *   accent / accent-hover    the single action color (buttons, links, focus)
+ *   confidence-*             machine extraction scores — red below the
+ *                            backend CONFIDENCE_THRESHOLD = 0.75
+ *   status-*                 review field states (human decisions)
+ *
+ * Typography contract: Inter carries human interface text; JetBrains Mono
+ * carries machine-generated data (confidence scores, field keys, hashes,
+ * document IDs). The typeface switch is a visual claim about provenance.
+ * Wiring lives in lib/fonts.ts; bindings are in the @theme inline block.
+ *
+ * There is no dark mode. This product is a paper document on a desk.
+ */
+
+@theme {
+  /* — Surfaces & foreground — */
+  --color-ink: #0a0a0b;
+  --color-ink-muted: #52525b;
+  --color-paper: #fafaf8;
+  --color-paper-muted: #f4f4f0;
+  --color-rule: #e4e4e7;
+
+  /* — Action — */
+  --color-accent: #1e40af;
+  --color-accent-hover: #1e3a8a;
+
+  /* — Confidence (machine-generated) — */
+  --color-confidence-high: #166534;
+  --color-confidence-mid: #92400e;
+  --color-confidence-low: #991b1b;
+
+  /* — Review field status (human decisions).
+     Note the intentional echoes: status-accepted = confidence-high,
+     status-rejected = confidence-low, status-corrected = accent —
+     a correction leaves the same trace as a deliberate action. — */
+  --color-status-pending: #71717a;
+  --color-status-accepted: #166534;
+  --color-status-corrected: #1e40af;
+  --color-status-rejected: #991b1b;
+  --color-status-missing: #78716c;
+
+  /* — Radius scale. Three sanctioned values; the design default is "none".
+     If a corner is not 0px, it must be 2px or 4px, and only for elements
+     where a square corner fails at small sizes. Nothing else is permitted. — */
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+/*
+ * Font bindings reference next/font variables that are attached to <html>
+ * at runtime by lib/fonts.ts. `inline` compiles each var() reference
+ * directly into the font-sans / font-mono utilities instead of emitting
+ * an intermediate variable — the documented Tailwind v4 + next/font
+ * pattern (same approach the shadcn Tailwind v4 docs use).
+ */
+@theme inline {
+  --font-sans:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas,
+    monospace;
+}
+
+@layer base {
+  /*
+   * Global defaults live here (not on <body> in layout.tsx) so that even
+   * global-error.tsx — which replaces the root layout — renders on paper.
+   */
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+
+  /*
+   * The keyboard focus ring is the one visual a page cannot remove, so it
+   * is owned: accent blue, 2px, offset 2px — legible against every
+   * surface and confidence token in this file.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

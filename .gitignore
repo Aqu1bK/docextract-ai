@@ -29,6 +29,10 @@ out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.vercel
+.turbo
+*.tsbuildinfo
+coverage/
 
 # IDE
 .vscode/
