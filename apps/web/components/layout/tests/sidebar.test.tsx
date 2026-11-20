@@ -43,7 +43,7 @@ describe('Sidebar', () => {
       'Upload',
       'Review',
       'Exports',
-      'Audit trail',
+      'Audit',
     ]
     for (const label of destinations) {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
@@ -72,10 +72,10 @@ describe('Sidebar', () => {
     expect(labelSpan).not.toBeNull()
     expect(labelSpan).toHaveTextContent('Documents')
 
-    const auditLink = screen.getByRole('link', { name: 'Audit trail' })
+    const auditLink = screen.getByRole('link', { name: 'Audit' });
     const auditLabel = auditLink.querySelector('span.hidden')
     expect(auditLabel).not.toBeNull()
-    expect(auditLabel).toHaveTextContent('Audit trail')
+    expect(auditLabel).toHaveTextContent('Audit')
   })
 
   it('threads arbitrary email + role props through to the footer', () => {

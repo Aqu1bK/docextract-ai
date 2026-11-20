@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/api/v1/endpoints/review.py
+
 """Review endpoints: the human-in-the-loop surface over HTTP.
 
 Reading is broad (ADMIN, REVIEWER, UPLOADER, VIEWER — anyone trusted to

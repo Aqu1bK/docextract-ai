@@ -8,8 +8,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Mirror tsconfig.json's "@/*" → "./*" (paths are relative to apps/web).
-      // ESM has no __dirname; the URL form is the portable equivalent.
+      // Mirror tsconfig.json's "@/*" → "./*" (paths are relative to
+      // apps/web). ESM has no __dirname; the URL form is the portable
+      // equivalent.
       '@': fileURLToPath(new URL('.', import.meta.url)),
     },
   },
@@ -17,5 +18,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.{test,spec}.{ts,tsx}'],
+    // The 9C export row imports lib/env (the download link's base URL),
+    // which fails fast on missing NEXT_PUBLIC_* values: load the test
+    // env the same way a Next build loads .env.local.
+    env: {
+      NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
+      NEXT_PUBLIC_DEMO_MODE: 'false',
+    },
   },
 });

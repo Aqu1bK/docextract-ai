@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/schemas/jobs.py
+
 """Request/response models for job creation and extraction status.
 
 The wire contract of the queue: what the status endpoint reports about a

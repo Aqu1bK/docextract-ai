@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/api/v1/endpoints/extraction.py
+
 """Extraction status endpoint: the client's window onto the queue.
 
 One route, GET /documents/{document_id}/extraction-status. It joins the

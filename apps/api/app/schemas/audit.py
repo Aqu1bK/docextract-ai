@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/schemas/audit.py
+
 """Response model for audit log rows.
 
 Audit rows are read-only over the API surface this phase exposes (the

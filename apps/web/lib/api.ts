@@ -1,3 +1,5 @@
+// docextract-ai/apps/web/lib/api.ts
+
 import { env } from './env';
 import { createClient } from './supabase-browser';
 
@@ -15,7 +17,6 @@ import { createClient } from './supabase-browser';
  * a session are sent unauthenticated — the backend's 401 is the honest
  * answer, and pages treat it as data.
  */
-
 
 /** The backend's error envelope: { error: { code, message, details } }. */
 export interface ApiErrorEnvelope {
@@ -46,7 +47,7 @@ export class ApiError extends Error {
   }
 }
 
-/** One page of documents, as GET /documents returns. */
+/** One page of documents, as GET /documents returns (raw backend shape). */
 export interface DocumentRecord {
   id: string;
   file_name: string;
@@ -93,7 +94,7 @@ export type DocumentStatus =
   | 'failed'
   | 'archived';
 
-/** One document summary (Chunk 4 naming). */
+/** One document summary (9B naming — camelCase fields). */
 export type DocumentSummary = {
   id: string;
   filename: string;
@@ -105,7 +106,7 @@ export type DocumentSummary = {
   created_at: string;
 };
 
-/** Paginated list wrapper (Chunk 4 contract). */
+/** Paginated list wrapper (9B contract). */
 export type Paginated<T> = {
   items: T[];
   total: number;
@@ -114,7 +115,7 @@ export type Paginated<T> = {
   total_pages: number;
 };
 
-/** Transform the backend's DocumentRecord → DocumentSummary (snake_case rename). */
+/** Transform backend's DocumentRecord → DocumentSummary. */
 function toSummary(record: DocumentRecord): DocumentSummary {
   return {
     id: record.id,
@@ -126,6 +127,58 @@ function toSummary(record: DocumentRecord): DocumentSummary {
     size_bytes: record.size_bytes,
     created_at: record.created_at,
   };
+}
+
+/** One extracted field (9C). */
+export interface FieldRecord {
+  id: string;
+  field_key: string;
+  field_label: string;
+  value_text: string | null;
+  confidence: number;
+  source: string;
+  page_number: number | null;
+  review_status: string;
+  original_value_text: string | null;
+  is_required: boolean;
+}
+
+/** One audit log row (9C). */
+export interface AuditLogRecord {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  actor_user_id: string | null;
+  metadata_json: Record<string, unknown>;
+  created_at: string;
+}
+
+/** One export row (9C). */
+export interface ExportRecord {
+  id: string;
+  format: 'json' | 'csv';
+  status: 'pending' | 'completed' | 'failed';
+  row_count: number | null;
+  expires_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+  error_message: string | null;
+}
+
+/** Extraction status response (9C). */
+export interface ExtractionStatusResponse {
+  document_status: string;
+  latest_job: {
+    id: string;
+    status: string;
+    attempts: number;
+    max_attempts: number;
+    error_code: string | null;
+    error_message: string | null;
+    created_at: string;
+    completed_at: string | null;
+  } | null;
 }
 
 /**
@@ -174,12 +227,13 @@ async function fetchWithAuth<T>(path: string, init: RequestInit = {}): Promise<T
 }
 
 /**
- * The backend surface Phase 9B needs: list, detail, and the two-step
- * upload flow. 9C extends this object with review/export/audit calls —
- * one place to extend, not many.
+ * The backend surface Phases 9B and 9C need: list, detail, the
+ * two-step upload flow, review/audit/export reads and mutations, the
+ * job status poll, and the source-PDF read URL — one place to extend,
+ * not many.
  */
 export const api = {
-  /** GET /documents — one page of the org's documents, newest first. */
+  /** GET /documents — paginated, returns DocumentSummary (9B contract). */
   getDocuments(
     params: { page?: number; pageSize?: number } = {},
   ): Promise<Paginated<DocumentSummary>> {
@@ -190,23 +244,87 @@ export const api = {
       skip: String(skip),
       limit: String(pageSize),
     });
-    return fetchWithAuth<DocumentsListResponse>(`/documents?${query.toString()}`).then(
-      (res) => ({
-        items: res.documents.map(toSummary),
-        total: res.total,
-        page,
-        page_size: pageSize,
-        total_pages: Math.max(1, Math.ceil(res.total / pageSize)),
-      }),
-    );
+    return fetchWithAuth<DocumentsListResponse>(`/documents?${query.toString()}`).then((res) => ({
+      items: res.documents.map(toSummary),
+      total: res.total,
+      page,
+      page_size: pageSize,
+      total_pages: Math.max(1, Math.ceil(res.total / pageSize)),
+    }));
   },
 
-  /** GET /documents/{id} — one document's metadata. */
+  /** GET /documents/{id} — one document's metadata (raw backend shape). */
   getDocument(id: string): Promise<DocumentRecord> {
     return fetchWithAuth<DocumentRecord>(`/documents/${id}`);
   },
 
-  /** POST /documents/upload-url — step 1 of the upload flow: mint the signed URL. */
+  /** GET /review/documents/{id}/fields — all fields with review status (9C). */
+  getDocumentFields(documentId: string): Promise<FieldRecord[]> {
+    return fetchWithAuth<FieldRecord[]>(`/review/documents/${documentId}/fields`);
+  },
+
+  /** PATCH /review/fields/{id} — correct one field's value (9C). */
+  correctField(fieldId: string, data: { value: string; reason?: string }): Promise<FieldRecord> {
+    return fetchWithAuth<FieldRecord>(`/review/fields/${fieldId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** POST /review/fields/{id}/accept (9C). */
+  acceptField(fieldId: string): Promise<FieldRecord> {
+    return fetchWithAuth<FieldRecord>(`/review/fields/${fieldId}/accept`, { method: 'POST' });
+  },
+
+  /** POST /review/fields/{id}/reject (9C). */
+  rejectField(fieldId: string, data: { reason?: string }): Promise<FieldRecord> {
+    return fetchWithAuth<FieldRecord>(`/review/fields/${fieldId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** POST /review/documents/{id}/approve (9C). */
+  approveDocument(documentId: string): Promise<DocumentRecord> {
+    return fetchWithAuth<DocumentRecord>(`/review/documents/${documentId}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  /** POST /review/documents/{id}/reject (9C). */
+  rejectDocument(documentId: string, data: { reason?: string }): Promise<DocumentRecord> {
+    return fetchWithAuth<DocumentRecord>(`/review/documents/${documentId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** GET /audit/documents/{id}/logs (9C). */
+  getAuditLogs(documentId: string): Promise<AuditLogRecord[]> {
+    return fetchWithAuth<AuditLogRecord[]>(`/audit/documents/${documentId}/logs`);
+  },
+
+  /** GET /exports/documents/{id}/exports (9C). */
+  getExports(documentId: string): Promise<ExportRecord[]> {
+    return fetchWithAuth<ExportRecord[]>(`/exports/documents/${documentId}/exports`);
+  },
+
+  /** POST /exports/documents/{id}/export (9C). */
+  createExport(documentId: string, data: { format: 'json' | 'csv' }): Promise<ExportRecord> {
+    return fetchWithAuth<ExportRecord>(`/exports/documents/${documentId}/export`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  /** GET /extraction/documents/{id}/extraction-status (9C). */
+  getExtractionStatus(documentId: string): Promise<ExtractionStatusResponse> {
+    return fetchWithAuth<ExtractionStatusResponse>(
+      `/extraction/documents/${documentId}/extraction-status`,
+    );
+  },
+
+  /** POST /documents/upload-url (9B). */
   requestUploadUrl(data: {
     file_name: string;
     content_type: string;
@@ -218,7 +336,7 @@ export const api = {
     });
   },
 
-  /** POST /documents — step 2: confirm the object landed in storage. */
+  /** POST /documents — confirm upload (9B). */
   confirmUpload(data: {
     document_id: string;
     storage_path: string;
@@ -230,5 +348,38 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  },
+
+  /**
+   * GET /documents/{id}/download — a short-lived read URL for the source PDF (9C).
+   *
+   * The endpoint responds with the object's bytes; calling it with
+   * fetch and reading the blob URL gives the viewer a same-origin URL
+   * pdf.js can load, while the Authorization header (which a plain
+   * <a href> cannot carry) authenticates the read.
+   */
+  async getDocumentDownloadUrl(id: string): Promise<string> {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const headers: Record<string, string> = {
+      Accept: 'application/pdf',
+      ...(session !== null ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    };
+
+    const response = await fetch(`${env.apiBaseUrl}/documents/${id}/download`, { headers });
+    if (!response.ok) {
+      throw new ApiError(
+        'DOWNLOAD_FAILED',
+        'The document could not be fetched.',
+        response.status,
+        null,
+      );
+    }
+
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
   },
 };

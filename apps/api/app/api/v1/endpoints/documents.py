@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/api/v1/endpoints/documents.py
+
 """Documents endpoints: the two-step upload contract over HTTP.
 
 Step one, ``POST /documents/upload-url``, hands the client a signed URL
@@ -7,19 +9,33 @@ API. Step two, ``POST /documents``, confirms the object, re-validates
 content, and records the document row. Both steps require ADMIN,
 REVIEWER, or UPLOADER: a VIEWER's place in the contract is reading, not
 intake.
+
+Phase 9B adds the read side: ``GET /documents`` pages through the
+organization's documents for every role — VIEWER included, because
+reading is exactly the role a viewer holds.
+
+Phase 9C adds ``GET /documents/{document_id}``: one document's metadata,
+the read the review screen's header and the audit/export panels hang
+off. Same org scoping as the list; the review screen's field/audit/
+export reads have their own endpoints on the review, audit, and export
+routers. ``GET /documents/{document_id}/download`` streams the source
+PDF for the review screen's PDF pane.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_roles
 from app.config import get_settings
-from app.db.models import User
+from app.db.models import Document, User
 from app.db.session import get_db
 from app.domain.enums import RoleName
+from app.errors import NotFoundException
 from app.schemas.documents import (
     ConfirmUploadRequest,
     ConfirmUploadResponse,
+    DocumentOut,
     UploadUrlRequest,
     UploadUrlResponse,
 )
@@ -29,34 +45,83 @@ from app.services.documents_list import list_documents
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage
 
-# Roles permitted to read the documents list. Reading is the one action
-# every role may perform, so all four are allowed. Hoisted to a module
-# constant so the endpoint's Depends(...) line stays under the 100-char
-# limit and needs only a single `# noqa: B008` (matching the other
-# endpoints in this file).
-DOCUMENTS_READ_ROLES = [
-    RoleName.ADMIN,
-    RoleName.REVIEWER,
-    RoleName.UPLOADER,
-    RoleName.VIEWER,
-]
-
 router = APIRouter()
+
+
+# Every role may read the list and the detail; intake endpoints stay write-gated.
+READ_ROLES = [RoleName.ADMIN, RoleName.REVIEWER, RoleName.UPLOADER, RoleName.VIEWER]
 
 
 @router.get("", response_model=DocumentsListOut)
 def get_documents(
     query: DocumentsListQuery = Depends(),  # noqa: B008
-    user: User = Depends(require_roles(DOCUMENTS_READ_ROLES)),  # noqa: B008
+    user: User = Depends(require_roles(READ_ROLES)),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> DocumentsListOut:
-    """List one page of the organization's documents, newest first.
+    """List the organization's documents, newest first, one page.
 
-    All four roles may read — writing (upload, review, approve, export)
-    is gated separately. Pagination is bounded by the schema (limit 1–100,
-    skip ≥ 0) so the API never serves an unbounded scan.
+    The list is org-scoped by the signed-in user's organization — a
+    client never chooses whose documents it sees. All four roles may
+    read it; pagination is validated by the query model's clamps.
     """
     return list_documents(db, user, query)
+
+
+@router.get("/{document_id}", response_model=DocumentOut)
+def get_document(
+    document_id: str,
+    user: User = Depends(require_roles(READ_ROLES)),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+) -> DocumentOut:
+    """Fetch one document's metadata by ID, org-scoped.
+
+    The detail read behind the review screen: header facts (file name,
+    status, page count) and nothing more — fields, audit, exports, and
+    the latest job live on their own endpoints, so this response stays
+    cacheable metadata. A document outside the caller's org is a 404,
+    never a 403 that would confirm its existence.
+    """
+    document = db.execute(
+        select(Document).where(
+            Document.id == document_id,
+            Document.organization_id == user.organization_id,
+        )
+    ).scalar_one_or_none()
+    if document is None:
+        raise NotFoundException(details={"document_id": document_id})
+    return DocumentOut.model_validate(document)
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: str,
+    user: User = Depends(require_roles(READ_ROLES)),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+    storage: StorageProvider = Depends(get_storage),  # noqa: B008
+) -> Response:
+    """Stream the document's stored PDF back for review-side viewing.
+
+    The Phase 9C review screen's PDF pane needs the source bytes; the
+    storage provider's ``download_file`` carries them at this product's
+    ≤10 MB demo scale (the documented four-operation contract — no
+    signed-read-URL method exists to redirect to). Org scoping follows
+    the detail read: a foreign document is a 404.
+    """
+    document = db.execute(
+        select(Document).where(
+            Document.id == document_id,
+            Document.organization_id == user.organization_id,
+        )
+    ).scalar_one_or_none()
+    if document is None:
+        raise NotFoundException(details={"document_id": document_id})
+
+    data = storage.download_file(document.storage_path)
+    return Response(
+        content=data,
+        media_type=document.content_type,
+        headers={"Content-Disposition": f'inline; filename="{document.file_name}"'},
+    )
 
 
 @router.post("/upload-url", response_model=UploadUrlResponse)

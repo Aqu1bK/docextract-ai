@@ -1,3 +1,5 @@
+// docextract-ai/apps/web/components/layout/nav-items.ts
+
 import {
   ClipboardCheck,
   Download,
@@ -9,28 +11,32 @@ import {
 } from 'lucide-react';
 
 /**
- * The product's primary navigation destinations, defined once and
- * consumed by the Sidebar. A nav item is the minimum shape the Sidebar
- * needs: a route, a human label, and an icon component.
+ * The application-wide nav definition.
  *
- * Adding a new destination = one entry here. The Sidebar renders
- * whatever this array contains, so the nav grows with the product
- * without any per-file changes.
+ * One entry per top-level product area. 9C lands the review surface at
+ * /documents/{id}: a reviewer's day starts at the Documents register,
+ * so "Review" points there — the register row's destination IS the
+ * review screen. The Exports and Audit items keep their hrefs for the
+ * cross-document screens of a later phase; a dedicated review route is
+ * out of scope for 9C, so this is the real wiring, not a placeholder.
+ * `current` is computed by the sidebar from the active pathname (9B).
  */
 export interface NavItem {
-  /** Route path, e.g. "/dashboard". */
+  /** Route the item points at. */
   href: string;
-  /** Visible label (and tooltip when collapsed). */
+  /** Sidebar label (hidden at the 64px collapsed width). */
   label: string;
-  /** Lucide icon component. */
+  /** lucide-react icon shown in both expanded and collapsed states. */
   icon: LucideIcon;
+  /** Whether this item is the active route. */
+  current: boolean;
 }
 
 export const navItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/review', label: 'Review', icon: ClipboardCheck },
-  { href: '/exports', label: 'Exports', icon: Download },
-  { href: '/audit', label: 'Audit trail', icon: ScrollText },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, current: true },
+  { href: '/documents', label: 'Documents', icon: FileText, current: false },
+  { href: '/upload', label: 'Upload', icon: Upload, current: false },
+  { href: '/documents', label: 'Review', icon: ClipboardCheck, current: false },
+  { href: '/exports', label: 'Exports', icon: Download, current: false },
+  { href: '/audit', label: 'Audit', icon: ScrollText, current: false },
 ];
