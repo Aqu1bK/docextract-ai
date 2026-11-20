@@ -1,48 +1,49 @@
 import { z } from 'zod';
 
 /**
- * The complete browser-facing environment contract.
+ * Environment contract for the browser bundle.
  *
- * Only these four NEXT_PUBLIC_* variables may ever be read in client code.
- * Next.js inlines NEXT_PUBLIC_* values at build time, so a wrong value is
- * frozen into the bundle — which is exactly why validation must run at
- * module load rather than "when used": a bad build should never boot.
+ * Next.js only forwards NEXT_PUBLIC_* variables to client code, which is
+ * the security boundary here: the API URL and demo flag are public by
+ * design, and the Supabase URL + anon key are the public client pair the
+ * demo intentionally ships. Server-only secrets never enter this module.
  *
- * Server-only secrets (DATABASE_URL, JWT_SECRET, ...) never appear here by
- * design; this module must be safely importable from any client component.
+ * Validation runs at module load — a misconfigured deploy fails fast at
+ * startup with the exact missing variable, not at some later render.
+ *
+ * Phase 9B tightens the two Supabase variables from "optional" to
+ * "required": auth is now the app's front door (login, middleware session
+ * refresh, API client tokens), so a missing Supabase config is a broken
+ * product, not a degraded one. The old `|| null` fallbacks are gone with
+ * them.
  */
-
-/** Treat an empty string ("KEY=" in a .env file) as unset. */
-const emptyAsUndefined = (value: unknown) => (value === '' ? undefined : value);
-
-const publicEnvSchema = z.object({
-  /** FastAPI base URL, e.g. http://localhost:8000 — required, no default. */
-  NEXT_PUBLIC_API_URL: z.string().url(),
-
-  /**
-   * Supabase project URL. Optional in 9A: local development runs without
-   * auth until Phase 9B wires Supabase Auth. Required from 9B onward
-   * (the login page will enforce it — this file stays lenient).
-   */
-  NEXT_PUBLIC_SUPABASE_URL: z.preprocess(
-    emptyAsUndefined,
-    z.string().url().optional(),
-  ),
-
-  /** Supabase anon key — public by design (RLS is the enforcement point). */
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.preprocess(
-    emptyAsUndefined,
-    z.string().min(1).optional(),
-  ),
-
-  /** Strictly 'true' | 'false'. Anything else is a typo and must fail. */
-  NEXT_PUBLIC_DEMO_MODE: z.enum(['true', 'false']).default('false'),
+const envSchema = z.object({
+  NEXT_PUBLIC_API_URL: z
+    .string()
+    .url('NEXT_PUBLIC_API_URL must be an absolute URL (e.g. http://localhost:8000/api/v1)'),
+  NEXT_PUBLIC_SUPABASE_URL: z
+    .string()
+    .url('NEXT_PUBLIC_SUPABASE_URL must be an absolute URL (e.g. https://xxxx.supabase.co)'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z
+    .string()
+    .min(1, 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required (the anon key is public by design)'),
+  NEXT_PUBLIC_DEMO_MODE: z
+    .string()
+    .regex(/^(true|false)$/, 'NEXT_PUBLIC_DEMO_MODE must be "true" or "false"')
+    .default('false'),
 });
 
-export type PublicEnv = z.infer<typeof publicEnvSchema>;
+/** The raw, Zod-validated NEXT_PUBLIC_* shape (the pre-9B access surface). */
+type PublicEnv = z.infer<typeof envSchema>;
 
+/**
+ * Validate process.env against the schema and return the parsed values.
+ *
+ * Fail-fast: every offending variable is reported at once, so a bad
+ * deploy is one readable error rather than a debugging session.
+ */
 function parsePublicEnv(): PublicEnv {
-  const parsed = publicEnvSchema.safeParse({
+  const parsed = envSchema.safeParse({
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -50,22 +51,35 @@ function parsePublicEnv(): PublicEnv {
   });
 
   if (!parsed.success) {
-    const fieldErrors = parsed.error.flatten().fieldErrors;
-    const details = Object.entries(fieldErrors)
-      .map(([key, messages]) => `  - ${key}: ${messages?.join(', ')}`)
+    const details = parsed.error.issues
+      .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
       .join('\n');
-    throw new Error(
-      `Invalid environment variables for apps/web.\n${details}\n` +
-        'Fix apps/web/.env.local (see the FRONTEND section of .env.example).',
-    );
+    throw new Error(`Invalid environment variables:\n${details}`);
   }
 
   return parsed.data;
 }
 
+const parsedEnv = parsePublicEnv();
+
 /**
- * Fail-fast: the first import of this module runs validation. The
- * DemoModeBanner imports `env`, so in practice the app cannot render a
- * single pixel with a broken environment.
+ * Reconciled env access — raw Zod values + derived short-names.
+ *
+ * `supabaseUrl` / `supabaseAnonKey` / `apiBaseUrl` are the short names
+ * consumed by lib/api.ts, lib/supabase-browser.ts, and
+ * lib/supabase-server.ts; the NEXT_PUBLIC_* keys are the authoritative
+ * values validated by the Zod schema.
+ *
+ * Supabase fields may be undefined in 9A (optional during early dev);
+ * the short-names mirror that optionality rather than lying with `!`.
  */
-export const env: PublicEnv = parsePublicEnv();
+export const env = {
+  ...parsedEnv,
+  apiBaseUrl: parsedEnv.NEXT_PUBLIC_API_URL,
+  supabaseUrl: parsedEnv.NEXT_PUBLIC_SUPABASE_URL,
+  supabaseAnonKey: parsedEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  /** Parsed boolean — true when the demo banner should render. */
+  demoMode: parsedEnv.NEXT_PUBLIC_DEMO_MODE === 'true',
+};
+
+export type Env = typeof env;

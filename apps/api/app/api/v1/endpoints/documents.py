@@ -24,11 +24,31 @@ from app.schemas.documents import (
     UploadUrlResponse,
 )
 from app.services.documents import confirm_upload, request_upload_url
+from app.schemas.documents_list import DocumentsListOut, DocumentsListQuery
+from app.services.documents_list import list_documents
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage
 
 router = APIRouter()
 
+@router.get("", response_model=DocumentsListOut)
+def get_documents(
+    query: DocumentsListQuery = Depends(),  # noqa: B008
+    user: User = Depends(  # noqa: B008
+        require_roles(
+            [RoleName.ADMIN, RoleName.REVIEWER, RoleName.UPLOADER, RoleName.VIEWER]
+        )
+    ),
+    db: Session = Depends(get_db),  # noqa: B008
+) -> DocumentsListOut:
+    """List one page of the organization's documents, newest first.
+
+    All four roles may read — writing (upload, review, approve, export)
+    is gated separately. Pagination is bounded by the schema (limit 1–100,
+    skip ≥ 0) so the API never serves an unbounded scan.
+    """
+    return list_documents(db, user, query)
+    
 
 @router.post("/upload-url", response_model=UploadUrlResponse)
 def create_upload_url(

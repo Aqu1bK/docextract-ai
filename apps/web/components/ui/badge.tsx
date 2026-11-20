@@ -19,6 +19,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'border-rule bg-paper-muted text-ink-muted',
+        outline: 'border-rule bg-transparent text-ink/70',
         'confidence-high': 'border-confidence-high/30 bg-confidence-high/10 font-mono text-confidence-high',
         'confidence-mid': 'border-confidence-mid/30 bg-confidence-mid/10 font-mono text-confidence-mid',
         'confidence-low': 'border-confidence-low/30 bg-confidence-low/10 font-mono text-confidence-low',

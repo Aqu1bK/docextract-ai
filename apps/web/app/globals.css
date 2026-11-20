@@ -47,6 +47,17 @@
   --color-status-rejected: #991b1b;
   --color-status-missing: #78716c;
 
+  /* — Pipeline status dot colors for the documents register.
+     Mapped from the backend's DocumentStatus enum (Phase 5).
+     queued/processing = info (in-flight);
+     needs_review/ready_for_review = warning (human attention);
+     approved = ok (green); rejected/failed = error (red);
+     uploaded/archived = neutral rule color. — */
+  --color-status-info: #1e40af;
+  --color-status-warning: #92400e;
+  --color-status-ok: #166534;
+  --color-status-error: #991b1b;
+
   /* — Radius scale. Three sanctioned values; the design default is "none".
      If a corner is not 0px, it must be 2px or 4px, and only for elements
      where a square corner fails at small sizes. Nothing else is permitted. — */

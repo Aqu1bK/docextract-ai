@@ -1,118 +1,99 @@
+// docextract-ai/apps/web/components/layout/sidebar.tsx
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import {
-  ClipboardCheck,
-  Download,
-  FileScan,
-  FileText,
-  LayoutDashboard,
-  ScrollText,
-  Upload,
-} from 'lucide-react';
+
+import { navItems } from '@/components/layout/nav-items';
 import { cn } from '@/lib/utils';
 
 /**
- * Fixed 240px rail (w-60); collapses to a 64px icon rail (w-16) below
- * 1280px via a resize listener. Icon-only items keep their label through
- * `title` + `aria-label` — no tooltip dependency needed in Phase 9A.
+ * Sidebar — the product's primary navigation.
  *
- * Destinations are placeholders until 9B/9C create the routes; only
- * /dashboard exists today.
+ * 240px expanded, 64px icon-only below the 1280px breakpoint: a CSS-only
+ * collapse (xl: variants), because a nav that needs JavaScript to choose
+ * its width is a nav that flashes. Active state is the accent-colored
+ * left edge — not a pill, not a shadow, a hairline that reads as ink
+ * underlining the current place in the workflow.
+ *
+ * Phase 9B: the active item is computed from the real pathname
+ * (usePathname — "current" is no longer static), and the footer shows
+ * the signed-in user's email + first role, both resolved server-side by
+ * the (app) layout and passed down as props.
  */
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/documents', label: 'Documents', icon: FileText },
-  { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/review', label: 'Review', icon: ClipboardCheck },
-  { href: '/exports', label: 'Exports', icon: Download },
-  { href: '/audit', label: 'Audit', icon: ScrollText },
-] as const;
+export interface SidebarProps {
+  /** Signed-in user's email (resolved by the (app) layout's session read). */
+  userEmail: string;
+  /** The user's backend roles (from GET /auth/me), first one displayed. */
+  userRoles: string[];
+}
 
-const COLLAPSE_BELOW = 1280;
+/** Two letters for the footer avatar square: "jo" from "jo@example.com". */
+function initialsFromEmail(email: string): string {
+  if (email.length === 0) return '–';
+  const [localPart] = email.split('@');
+  return localPart.slice(0, 2).toLowerCase();
+}
 
-export function Sidebar() {
+export function Sidebar({ userEmail, userRoles }: SidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
 
-  useEffect(() => {
-    const update = () => setCollapsed(window.innerWidth < COLLAPSE_BELOW);
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+  const items = navItems.map((item) => ({
+    ...item,
+    current: pathname === item.href || pathname.startsWith(`${item.href}/`),
+  }));
 
   return (
-    <aside
-      className={cn(
-        'flex h-full shrink-0 flex-col border-r border-rule bg-paper',
-        collapsed ? 'w-16' : 'w-60',
-      )}
-      aria-label="Primary"
-    >
-      {/* Brand — the "AI" is set in the mono face: the machine part of the
-          product name, typeset like the machine data it refers to. */}
-      <Link
-        href="/dashboard"
-        className="flex h-14 items-center gap-2.5 border-b border-rule px-4"
-        aria-label="DocExtract AI home"
-      >
-        <FileScan className="size-5 shrink-0 text-ink" aria-hidden />
-        {!collapsed && (
-          <span className="text-sm font-semibold tracking-tight text-ink">
-            DocExtract <span className="font-mono font-medium">AI</span>
-          </span>
-        )}
-      </Link>
+    <aside className="flex h-full w-16 flex-col border-r border-rule bg-paper lg:w-60">
+      {/* Wordmark: full name when there is room, square glyph when not. */}
+      <div className="flex h-14 items-center gap-3 border-b border-rule px-4">
+        <span
+          aria-hidden
+          className="flex size-8 shrink-0 items-center justify-center bg-ink font-mono text-sm font-medium text-paper"
+        >
+          Dx
+        </span>
+        <span className="hidden text-sm font-semibold tracking-tight lg:inline">DocExtract AI</span>
+      </div>
 
-      {/* Primary navigation. Inactive items carry a 2px transparent left
-          border so activating an item never shifts the label 2px. */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {NAV_ITEMS.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              aria-label={collapsed ? item.label : undefined}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex items-center gap-3 border-l-2 px-3 py-2 text-sm',
-                collapsed && 'justify-center px-0',
-                active
-                  ? 'border-accent bg-paper-muted font-medium text-ink'
-                  : 'border-transparent text-ink-muted hover:bg-paper-muted/60 hover:text-ink',
-              )}
-            >
-              <Icon className="size-4 shrink-0" aria-hidden />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
+      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 p-2">
+        {items.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={item.current ? 'page' : undefined}
+            title={item.label}
+            className={cn(
+              'flex h-9 items-center gap-3 px-3 text-sm transition-colors',
+              item.current
+                ? 'bg-paper-muted font-medium text-ink [box-shadow:inset_3px_0_0_var(--color-accent)]'
+                : 'text-ink-muted hover:bg-paper-muted hover:text-ink',
+            )}
+          >
+            <item.icon className="size-4 shrink-0" />
+            <span className="hidden lg:inline">{item.label}</span>
+          </Link>
+        ))}
       </nav>
 
-      {/* Session — placeholder values until 9B wires the Supabase user. */}
+      {/* Signed-in user — email + role, resolved before the shell rendered. */}
       <div className="border-t border-rule p-3">
-        <div
-          className={cn(
-            'flex items-center gap-2.5',
-            collapsed && 'justify-center',
-          )}
-        >
-          <div className="flex size-8 shrink-0 items-center justify-center border border-rule bg-paper-muted text-xs font-medium text-ink">
-            DE
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-8 shrink-0 items-center justify-center border border-rule bg-paper-muted font-mono text-xs font-medium text-ink"
+          >
+            {initialsFromEmail(userEmail)}
+          </span>
+          <div className="hidden min-w-0 lg:block">
+            <p className="truncate text-xs text-ink" title={userEmail}>
+              {userEmail}
+            </p>
+            <p className="truncate font-mono text-[10px] text-ink-muted">
+              {userRoles[0] ?? 'signed-in'}
+            </p>
           </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="truncate text-xs text-ink">user@example.com</p>
-              <p className="text-xs text-ink-muted">Recruiter</p>
-            </div>
-          )}
         </div>
       </div>
     </aside>

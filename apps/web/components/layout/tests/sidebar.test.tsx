@@ -1,80 +1,91 @@
-import { act, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { Sidebar } from '../sidebar';
+// docextract-ai/apps/web/components/layout/tests/sidebar.test.tsx
+
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+
+import { Sidebar } from '../sidebar'
+
+const TEST_EMAIL = 'test@example.com'
+const TEST_ROLES = ['reviewer']
 
 /**
- * Smoke tests for the App Shell rail: the six destinations render, the
- * brand renders, and the 1280px collapse/expand behavior works in both
- * directions. Component-level only — routing integration is 9B/9C scope.
+ * Sidebar — smoke tests against the Phase 9B rewrite.
+ *
+ * Key behavior changes from 9A that the tests must reflect:
+ *   1. Brand mark is a <div> (not a <Link>) — query by text, not role.
+ *   2. Collapse is CSS-only (`hidden lg:inline`) — labels stay in the
+ *      DOM at every viewport; jsdom cannot evaluate responsive CSS,
+ *      so "collapsed" is not a testable DOM state. We assert the
+ *      labels exist with the hidden utility class instead.
+ *   3. Email + role come from props — assert the passed values, not
+ *      a hardcoded fixture.
+ *
+ * `usePathname` is stubbed to /dashboard so the Dashboard item gets
+ * `aria-current="page"` and we can verify the active-state wiring.
  */
 
-// usePathname throws outside a running Next app; the Sidebar reads it only
-// to mark the active item, so stub it to a fixed route.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
-}));
-
-/** Simulate a viewport change and flush React's state update. */
-const setViewport = (width: number) => {
-  window.innerWidth = width;
-  window.dispatchEvent(new Event('resize'));
-};
+}))
 
 describe('Sidebar', () => {
-  it('renders the brand mark and all six navigation destinations', () => {
-    // jsdom defaults to innerWidth 1024, which collapses the rail — pin a
-    // desktop viewport before the mount effect reads it.
-    window.innerWidth = 1920;
-    render(<Sidebar />);
+  it('renders the brand, all six destinations, and the session footer', () => {
+    render(<Sidebar userEmail={TEST_EMAIL} userRoles={TEST_ROLES} />)
 
-    expect(
-      screen.getByRole('link', { name: 'DocExtract AI home' }),
-    ).toBeInTheDocument();
+    // Brand mark — a div with the glyph and product name (not a link).
+    expect(screen.getByText('Dx')).toBeInTheDocument()
+    expect(screen.getByText('DocExtract AI')).toBeInTheDocument()
 
+    // All six nav destinations render.
     const destinations = [
       'Dashboard',
       'Documents',
       'Upload',
       'Review',
       'Exports',
-      'Audit',
-    ];
+      'Audit trail',
+    ]
     for (const label of destinations) {
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
 
-    // Active-route logic: the stubbed pathname is /dashboard.
+    // Active-route wiring: pathname is stubbed to /dashboard.
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
       'aria-current',
       'page',
-    );
+    )
 
-    // Session footer (placeholder values until 9B).
-    expect(screen.getByText('user@example.com')).toBeInTheDocument();
-  });
+    // Session footer renders the passed email + first role.
+    expect(screen.getByText(TEST_EMAIL)).toBeInTheDocument()
+    expect(screen.getByText(TEST_ROLES[0])).toBeInTheDocument()
+  })
 
-  it('collapses to the icon-only rail below 1280px', () => {
-    window.innerWidth = 1920;
-    render(<Sidebar />);
+  it('keeps all nav labels in the DOM (CSS-only collapse)', () => {
+    // 9B uses CSS-only collapse (`hidden lg:inline`) — labels stay in
+    // the DOM at every viewport. jsdom cannot evaluate responsive CSS,
+    // so "collapsed" is not a testable DOM state; we assert the
+    // labels exist and carry the hidden utility class.
+    render(<Sidebar userEmail={TEST_EMAIL} userRoles={TEST_ROLES} />)
 
-    act(() => setViewport(1024));
+    const documentsLink = screen.getByRole('link', { name: 'Documents' })
+    const labelSpan = documentsLink.querySelector('span.hidden')
+    expect(labelSpan).not.toBeNull()
+    expect(labelSpan).toHaveTextContent('Documents')
 
-    // Visible labels are unmounted; the accessible names survive through
-    // aria-label, so icon-only links remain announced to screen readers.
-    expect(screen.queryByText('Documents')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Documents' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Audit' })).toBeInTheDocument();
-    expect(screen.queryByText('user@example.com')).not.toBeInTheDocument();
-  });
+    const auditLink = screen.getByRole('link', { name: 'Audit trail' })
+    const auditLabel = auditLink.querySelector('span.hidden')
+    expect(auditLabel).not.toBeNull()
+    expect(auditLabel).toHaveTextContent('Audit trail')
+  })
 
-  it('expands again at 1280px and above', () => {
-    window.innerWidth = 1024;
-    render(<Sidebar />);
+  it('threads arbitrary email + role props through to the footer', () => {
+    render(<Sidebar userEmail="alice@corp.com" userRoles={['admin']} />)
 
-    // Exactly 1280 is the expand boundary (collapse is strictly below).
-    act(() => setViewport(1280));
+    // The footer renders whatever was passed — not a hardcoded fixture.
+    expect(screen.getByText('alice@corp.com')).toBeInTheDocument()
+    expect(screen.getByText('admin')).toBeInTheDocument()
 
-    expect(screen.getByText('Documents')).toBeInTheDocument();
-    expect(screen.getByText('user@example.com')).toBeInTheDocument();
-  });
-});
+    // Initials are derived from the email ("al" from "alice@").
+    expect(screen.getByText('al')).toBeInTheDocument()
+  })
+})
