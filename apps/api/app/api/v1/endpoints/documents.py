@@ -35,16 +35,9 @@ router = APIRouter()
 @router.get("", response_model=DocumentsListOut)
 def get_documents(
     query: DocumentsListQuery = Depends(),  # noqa: B008
-    user: User = Depends(
-        require_roles(
-            [  # noqa: B008
-                RoleName.ADMIN,
-                RoleName.REVIEWER,
-                RoleName.UPLOADER,
-                RoleName.VIEWER,
-            ]
-        )
-    ),
+    user: User = Depends(require_roles([  # noqa: B008
+        RoleName.ADMIN, RoleName.REVIEWER, RoleName.UPLOADER, RoleName.VIEWER,
+    ])),
     db: Session = Depends(get_db),  # noqa: B008
 ) -> DocumentsListOut:
     """List one page of the organization's documents, newest first.
