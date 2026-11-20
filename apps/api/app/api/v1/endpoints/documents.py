@@ -29,15 +29,25 @@ from app.services.documents_list import list_documents
 from app.storage.base import StorageProvider
 from app.storage.factory import get_storage
 
+# Roles permitted to read the documents list. Reading is the one action
+# every role may perform, so all four are allowed. Hoisted to a module
+# constant so the endpoint's Depends(...) line stays under the 100-char
+# limit and needs only a single `# noqa: B008` (matching the other
+# endpoints in this file).
+DOCUMENTS_READ_ROLES = [
+    RoleName.ADMIN,
+    RoleName.REVIEWER,
+    RoleName.UPLOADER,
+    RoleName.VIEWER,
+]
+
 router = APIRouter()
 
 
 @router.get("", response_model=DocumentsListOut)
 def get_documents(
     query: DocumentsListQuery = Depends(),  # noqa: B008
-    user: User = Depends(require_roles([  # noqa: B008
-        RoleName.ADMIN, RoleName.REVIEWER, RoleName.UPLOADER, RoleName.VIEWER,
-    ])),
+    user: User = Depends(require_roles(DOCUMENTS_READ_ROLES)),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ) -> DocumentsListOut:
     """List one page of the organization's documents, newest first.
