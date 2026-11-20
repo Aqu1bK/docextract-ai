@@ -46,7 +46,12 @@ class TestGetDocument:
         assert body["page_count"] == 1
 
     def test_foreign_org_document_is_404(
-        self, client_with_db, db_session, seed_document_with_fields, seed_test_user, create_test_token
+        self,
+        client_with_db,
+        db_session,
+        seed_document_with_fields,
+        seed_test_user,
+        create_test_token,
     ) -> None:
         """A document in another org 404s for this caller's token."""
         document = seed_document_with_fields(email="owner@t.dev", org_slug="owner-org")
@@ -71,7 +76,14 @@ class TestAuditLogs:
         document = seed_document_with_fields()
         user = db_session.execute(select(User).where(User.id == document.uploaded_by)).scalar_one()
 
-        write_audit_log(db_session, user, "document.approved", "document", str(document.id), {"n": 1})
+        write_audit_log(
+            db_session,
+            user,
+            "document.approved",
+            "document",
+            str(document.id),
+            {"n": 1},
+        )
         db_session.flush()
         # Rows written in the same transaction share func.now()'s single
         # clock tick, exactly like the 9B list tests' created_at ties: force
@@ -85,7 +97,14 @@ class TestAuditLogs:
             )
         )
         db_session.flush()
-        write_audit_log(db_session, user, "document.rejected", "document", str(document.id), {"n": 2})
+        write_audit_log(
+            db_session,
+            user,
+            "document.rejected",
+            "document",
+            str(document.id),
+            {"n": 2},
+        )
         db_session.flush()
 
         token = create_test_token(email=user.email)
@@ -102,7 +121,9 @@ class TestAuditLogs:
         assert set(actions) == {"document.approved", "document.rejected"}
         assert all(log["entity_id"] == str(document.id) for log in logs)
 
-    def test_unknown_document_is_404(self, client_with_db, seed_test_user, create_test_token) -> None:
+    def test_unknown_document_is_404(
+        self, client_with_db, seed_test_user, create_test_token
+    ) -> None:
         """The timeline read 404s for a document the caller's org does not own."""
         user = seed_test_user(email="audit-reader@t.dev", roles=["reviewer"])
         token = create_test_token(email=user.email)
@@ -119,7 +140,12 @@ class TestDownloadExport:
     """GET /exports/documents/{id}/exports/{id}/download — the download."""
 
     def test_streams_completed_export_bytes(
-        self, client_with_db, db_session, storage_override, seed_document_with_fields, create_test_token
+        self,
+        client_with_db,
+        db_session,
+        storage_override,
+        seed_document_with_fields,
+        create_test_token,
     ) -> None:
         """A completed export downloads its bytes with attachment headers."""
         document = seed_document_with_fields()
