@@ -54,12 +54,16 @@ def get_document_audit_logs(
     if document is None:
         raise NotFoundException(details={"document_id": document_id})
 
-    logs = db.execute(
-        select(AuditLog)
-        .where(
-            AuditLog.entity_type == "document",
-            AuditLog.entity_id == document_id,
+    logs = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "document",
+                AuditLog.entity_id == document_id,
+            )
+            .order_by(AuditLog.created_at.desc())
         )
-        .order_by(AuditLog.created_at.desc())
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [AuditLogOut.model_validate(log) for log in logs]
