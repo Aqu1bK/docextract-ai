@@ -45,7 +45,7 @@ users-table lookup. The token proves identity; the database row proves
 authorization.
 """
 
-from typing import Any
+from typing import Any, cast
 
 import jwt
 import structlog
@@ -68,6 +68,15 @@ logger = structlog.get_logger(__name__)
 HS256_ALGORITHM = "HS256"
 ASYMMETRIC_ALGORITHMS = ("ES256", "RS256")
 SUPPORTED_ALGORITHMS = (HS256_ALGORITHM, *ASYMMETRIC_ALGORITHMS)
+
+# Supabase stamps "aud": "authenticated" on user tokens, but audience is
+# not a trust boundary for this API: authorization comes from the roles
+# table after the users-table lookup, and the security-relevant claims
+# are signature + issuer + expiry. PyJWT's audience check requires an
+# explicit expected audience; disabling it keeps verification focused on
+# the claims that matter here (and keeps locally-minted test tokens,
+# which carry no aud claim, valid).
+DECODE_OPTIONS: dict[str, Any] = {"verify_aud": False}
 
 # Module-level cache for the JWKS client: one client (and therefore one
 # fetched-and-cached key set) per process. Rebuilt only if the JWKS URL
@@ -128,6 +137,7 @@ def _verify_hs256(token: str, settings: Settings) -> dict[str, Any]:
             key=settings.SUPABASE_JWT_SECRET,
             algorithms=[HS256_ALGORITHM],
             issuer=settings.jwt_issuer,
+            options=cast(Any, DECODE_OPTIONS),
         )
     except jwt.InvalidTokenError as exc:
         raise _reject(exc) from exc
@@ -160,6 +170,7 @@ def _verify_asymmetric(token: str, algorithm: str, kid: str, settings: Settings)
             key=signing_key.key,
             algorithms=[algorithm],
             issuer=settings.jwt_issuer,
+            options=cast(Any, DECODE_OPTIONS),
         )
     except jwt.InvalidTokenError as exc:
         raise _reject(exc) from exc
