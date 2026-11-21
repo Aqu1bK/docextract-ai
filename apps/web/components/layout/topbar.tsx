@@ -81,12 +81,12 @@ export function Topbar({ title, userEmail, userRoles }: TopbarProps) {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onSelect={() => {
-              void handleSignOut();
-            }}
-          >
+          onClick={() => {
+             void handleSignOut();
+              }}
+             >
             Sign out
-          </DropdownMenuItem>
+             </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>

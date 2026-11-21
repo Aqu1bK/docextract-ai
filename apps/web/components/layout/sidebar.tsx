@@ -60,7 +60,7 @@ export function Sidebar({ userEmail, userRoles }: SidebarProps) {
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 p-2">
         {items.map((item) => (
           <Link
-            key={item.href}
+            key={item.label}
             href={item.href}
             aria-current={item.current ? 'page' : undefined}
             title={item.label}

@@ -358,3 +358,87 @@ def seed_document_with_fields(db_session: Session) -> Callable[..., Document]:
         return document
 
     return _seed_document_with_fields
+
+
+# ----------------------------------------------------------------------
+# Asymmetric (ES256) fixtures (Phase 9C.1)
+# ----------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def es256_test_keypair():
+    """Session-scoped ECC keypair for minting ES256 test tokens.
+
+    Generated once per test session — expensive, and the public key is
+    what the fake JWKS client serves, so it must be stable across tests.
+    """
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key()
+    return private_key, public_key
+
+
+@pytest.fixture
+def create_es256_test_token(es256_test_keypair):
+    """Mint a locally-signed ES256 token with the same claims Supabase sends."""
+    from datetime import UTC, datetime, timedelta
+
+    import jwt
+
+    private_key, _ = es256_test_keypair
+
+    def _factory(
+        email: str,
+        kid: str = "test-es256-key",
+        exp_offset_seconds: int = 3600,
+    ) -> str:
+        now = datetime.now(UTC)
+        payload = {
+            "sub": email,
+            "email": email,
+            "iss": get_settings().jwt_issuer,
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(seconds=exp_offset_seconds)).timestamp()),
+            "role": "authenticated",
+        }
+        return jwt.encode(
+            payload,
+            private_key,
+            algorithm="ES256",
+            headers={"kid": kid},
+        )
+
+    return _factory
+
+
+@pytest.fixture
+def fake_jwks_client(monkeypatch, es256_test_keypair):
+    """Patch the module-level JWKS client in jwt_validator to serve the test
+    public key, so ES256 tests never hit the network.
+    """
+    from app.auth import jwt_validator
+
+    _, public_key = es256_test_keypair
+    kid = "test-es256-key"
+
+    class FakeSigningKey:
+        def __init__(self, key):
+            self.key = key
+
+    class FakeJWKClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_signing_key(self, target_kid):
+            if target_kid != kid:
+                from jwt import PyJWKClientError
+
+                raise PyJWKClientError(f"unknown kid: {target_kid}")
+            return FakeSigningKey(public_key)
+
+        def get_signing_key_from_jwt(self, token):
+            header = jwt.get_unverified_header(token)
+            return self.get_signing_key(header.get("kid"))
+
+    monkeypatch.setattr(jwt_validator, "_get_jwk_client", lambda settings: FakeJWKClient())

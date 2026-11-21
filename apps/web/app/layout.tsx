@@ -1,39 +1,61 @@
 import type { Metadata } from 'next';
-import { fontMono, fontSans } from '@/lib/fonts';
+import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Toaster } from 'sonner';
+
+import { Providers } from '@/components/providers';
 import './globals.css';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: {
+    template: '%s | DocExtract AI',
     default: 'DocExtract AI',
-    template: '%s — DocExtract AI',
   },
-  description:
-    'Document extraction with a human decision on every field. Upload, review, correct, and export candidate data with a full audit trail.',
+  description: 'Document extraction and human review platform.',
 };
 
 /**
- * Root layout for the whole app.
+ * Root layout — the document skeleton shared by every route.
  *
- * Both font variables must attach here: --font-inter for the sans stack
- * and --font-jetbrains-mono for the mono stack (globals.css binds both
- * via @theme inline — either variable missing and that whole type family
- * silently falls back to the generic stack).
+ * Fonts load here (self-hosted via next/font — no runtime Google request,
+ * no CLS). The Providers component is the boundary for client-only state
+ * (TanStack Query's QueryClient, created lazily per browser session).
+ * The Toaster is mounted once at the root so any screen can surface toasts
+ * without its own <Toaster /> instance.
  *
- * `theme-light` is a static marker class, not a toggle. There is no theme
- * provider, no `dark` class, and therefore no suppressHydrationWarning:
- * nothing ever mutates this element after hydration.
+ * Route-group layouts below this (`(app)/layout.tsx`, `(auth)/layout.tsx`)
+ * compose inside this one: `(app)` adds the AppShell with the auth guard,
+ * `(auth)` stays shell-free so the login screen renders without chrome.
  */
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      className={`${fontSans.variable} ${fontMono.variable} theme-light`}
-    >
-      <body>{children}</body>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+      <body className="min-h-dvh bg-paper font-sans text-ink antialiased">
+        <Providers>
+          {children}
+        </Providers>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            className: 'border border-rule bg-paper text-ink',
+          }}
+        />
+      </body>
     </html>
   );
 }

@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/tests/test_auth.py
+
 """Auth and RBAC tests: the full validation stack without a real Supabase project.
 
 Every token is minted locally, signed with the same HS256 secret the
@@ -241,3 +243,79 @@ def test_require_roles_with_no_roles_returns_403(
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+# ----------------------------------------------------------------------
+# Asymmetric (ES256) JWT verification via JWKS (Phase 9C.1)
+# ----------------------------------------------------------------------
+
+
+def test_es256_valid_token_returns_user(
+    client_with_db, create_es256_test_token, seed_test_user, fake_jwks_client
+) -> None:
+    """A valid ES256 token (JWKS path) returns 200 with identity and roles."""
+    seed_test_user("es256@auth.test", roles=["reviewer"])
+    token = create_es256_test_token("es256@auth.test")
+
+    response = client_with_db.get("/api/v1/auth/me", headers=auth_header(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == "es256@auth.test"
+    assert body["roles"] == ["reviewer"]
+
+
+def test_es256_expired_token_returns_401(
+    client_with_db, create_es256_test_token, seed_test_user, fake_jwks_client
+) -> None:
+    """An expired ES256 token is rejected with ExpiredSignatureError."""
+    seed_test_user("es256-expired@auth.test", roles=["viewer"])
+    token = create_es256_test_token("es256-expired@auth.test", exp_offset_seconds=-60)
+
+    response = client_with_db.get("/api/v1/auth/me", headers=auth_header(token))
+
+    assert response.status_code == 401
+    assert response.json()["error"]["details"]["reason"] == "ExpiredSignatureError"
+
+
+def test_es256_unknown_kid_returns_401(
+    client_with_db, create_es256_test_token, seed_test_user, fake_jwks_client
+) -> None:
+    """A token whose kid is not in the JWKS is rejected."""
+    seed_test_user("es256-unknown@auth.test", roles=["viewer"])
+    token = create_es256_test_token("es256-unknown@auth.test", kid="rotated-out-key")
+
+    response = client_with_db.get("/api/v1/auth/me", headers=auth_header(token))
+
+    assert response.status_code == 401
+    assert response.json()["error"]["details"]["reason"] == "PyJWKClientError"
+
+
+def test_es256_wrong_issuer_returns_401(
+    client_with_db, es256_test_keypair, seed_test_user, fake_jwks_client
+) -> None:
+    """An ES256 token with the wrong iss claim is rejected."""
+    from datetime import UTC, datetime, timedelta
+
+    import jwt
+
+    seed_test_user("es256-wrong-iss@auth.test", roles=["viewer"])
+    private_key, _ = es256_test_keypair
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "sub": "es256-wrong-iss@auth.test",
+            "email": "es256-wrong-iss@auth.test",
+            "iss": "https://attacker.supabase.co/auth/v1",
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(seconds=3600)).timestamp()),
+        },
+        private_key,
+        algorithm="ES256",
+        headers={"kid": "test-es256-key"},
+    )
+
+    response = client_with_db.get("/api/v1/auth/me", headers=auth_header(token))
+
+    assert response.status_code == 401
+    assert response.json()["error"]["details"]["reason"] == "InvalidIssuerError"

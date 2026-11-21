@@ -1,3 +1,5 @@
+# docextract-ai/apps/api/app/config.py
+
 """Application settings loaded from environment variables.
 
 Twelve-Factor app methodology stores configuration in the environment, never in
@@ -104,6 +106,11 @@ class Settings(BaseSettings):
     def jwt_issuer(self) -> str:
         """Return the JWT issuer URL, defaulting to SUPABASE_URL + /auth/v1."""
         return self.JWT_ISSUER or f"{self.SUPABASE_URL}/auth/v1"
+
+    @property
+    def jwt_jwks_url(self) -> str:
+        """Return the JWKS endpoint URL, defaulting to SUPABASE_URL + /.well-known/jwks.json."""
+        return f"{self.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 
     @property
     def is_production(self) -> bool:

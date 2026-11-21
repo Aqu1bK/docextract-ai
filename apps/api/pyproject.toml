@@ -18,7 +18,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "psycopg[binary]>=3.1",
-    "PyJWT>=2.8",  # JWT validation for Supabase Auth tokens
+    "pyjwt[crypto]>=2.14",  # JWT validation for Supabase Auth tokens; [crypto] enables ES256/RS256 verification, >=2.14 for the CVE-2026-102267 redirect-trust fix
     "pypdf>=4",  # PDF structure validation: page count, encryption check
     "storage3>=0.8",  # official Supabase Storage client (supabase-py's storage layer)
     "minio>=7.2",  # official MinIO client for Local Docker Mode storage
